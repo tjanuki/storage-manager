@@ -35,4 +35,27 @@ export interface User {
     updated_at: string;
 }
 
+export interface Video {
+    id: number;
+    user_id: number;
+    title: string;
+    description: string | null;
+    original_filename: string;
+    s3_key: string;
+    s3_bucket: string;
+    s3_region: string;
+    size: number;
+    formatted_size: string;
+    mime_type: string;
+    duration: number | null;
+    formatted_duration: string | null;
+    status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
+    upload_id: string | null;
+    metadata: Record<string, any> | null;
+    uploaded_at: string | null;
+    created_at: string;
+    updated_at: string;
+    s3_url?: string;
+}
+
 export type BreadcrumbItemType = BreadcrumbItem;
