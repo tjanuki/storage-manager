@@ -43,10 +43,10 @@
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     v-if="video.status === 'completed' && video.s3_url"
-                    @click="openVideo(video.s3_url)"
+                    @click="() => router.visit(`/videos/${video.id}`)"
                   >
                     <Play class="mr-2 h-4 w-4" />
-                    Play
+                    View
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="video.status === 'completed' && video.s3_url"
@@ -164,10 +164,6 @@ function getStatusVariant(status: string) {
     default:
       return 'outline' as const
   }
-}
-
-function openVideo(url: string) {
-  window.open(url, '_blank')
 }
 
 function downloadVideo(url: string, title: string) {

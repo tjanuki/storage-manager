@@ -64,6 +64,31 @@ class VideoController extends Controller
         ]);
     }
 
+    public function show(Video $video): Response
+    {
+        // Verify ownership
+        if ($video->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        return Inertia::render('Videos/View', [
+            'video' => [
+                'id' => $video->id,
+                'title' => $video->title,
+                'description' => $video->description,
+                'size' => $video->size,
+                'formatted_size' => $video->formatted_size,
+                'duration' => $video->duration,
+                'formatted_duration' => $video->formatted_duration,
+                'status' => $video->status,
+                'mime_type' => $video->mime_type,
+                'uploaded_at' => $video->uploaded_at?->format('Y-m-d H:i:s'),
+                'created_at' => $video->created_at->format('Y-m-d H:i:s'),
+                's3_url' => $video->status === 'completed' ? $this->getPresignedUrl($video) : null,
+            ],
+        ]);
+    }
+
     public function initiateUpload(Request $request): JsonResponse
     {
         $request->validate([

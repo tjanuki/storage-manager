@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified'])->prefix('videos')->name('videos.')->group(function () {
     Route::get('/', [VideoController::class, 'index'])->name('index');
     Route::get('/upload', [VideoController::class, 'create'])->name('create');
+    Route::get('/{video}', [VideoController::class, 'show'])->name('show');
     
     // API routes for multipart upload
     Route::post('/initiate-upload', [VideoController::class, 'initiateUpload'])->name('initiate-upload');
