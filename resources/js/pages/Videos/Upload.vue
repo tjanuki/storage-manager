@@ -86,15 +86,54 @@
             </div>
           </div>
 
-          <div v-if="isUploading" class="space-y-2">
-            <div class="flex items-center justify-between text-sm">
-              <span>Uploading...</span>
-              <span>{{ uploadProgress }}%</span>
+          <div v-if="isUploading" class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <Loader2 class="h-4 w-4 animate-spin text-primary" />
+                <span class="text-sm font-medium">
+                  {{ uploadPhase === 'initiating' ? 'Preparing upload...' :
+                     uploadPhase === 'uploading' ? 'Uploading video...' :
+                     uploadPhase === 'completing' ? 'Finalizing upload...' : 'Processing...' }}
+                </span>
+              </div>
+              <span class="text-sm font-semibold">{{ uploadProgress }}%</span>
             </div>
-            <Progress :value="uploadProgress" />
-            <p class="text-xs text-muted-foreground">
-              {{ formatFileSize(uploadedBytes) }} / {{ formatFileSize(selectedFile?.size || 0) }}
-            </p>
+            
+            <div class="relative">
+              <Progress :value="uploadProgress" class="h-3" />
+              <div 
+                class="absolute inset-0 h-3 overflow-hidden rounded-full"
+                v-if="uploadPhase === 'uploading'"
+              >
+                <div class="h-full animate-pulse bg-primary/20" />
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 text-xs">
+              <div class="space-y-1">
+                <p class="text-muted-foreground">Uploaded</p>
+                <p class="font-medium">
+                  {{ formatFileSize(uploadedBytes) }} / {{ formatFileSize(selectedFile?.size || 0) }}
+                </p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-muted-foreground">Speed</p>
+                <p class="font-medium flex items-center gap-1">
+                  <TrendingUp class="h-3 w-3" />
+                  {{ formatSpeed(uploadSpeed) }}
+                </p>
+              </div>
+            </div>
+            
+            <div v-if="uploadPhase === 'uploading' && uploadSpeed > 0" class="rounded-lg bg-muted/50 p-3">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-1 text-muted-foreground">
+                  <Clock class="h-3 w-3" />
+                  <span>Time remaining</span>
+                </div>
+                <span class="font-medium">{{ formatTime(estimatedTimeRemaining) }}</span>
+              </div>
+            </div>
           </div>
 
           <Alert v-if="error" variant="destructive">
@@ -106,17 +145,19 @@
         <CardFooter class="flex justify-end space-x-2">
           <Button
             @click="cancelUpload"
-            variant="outline"
+            :variant="isUploading ? 'destructive' : 'outline'"
             :disabled="!isUploading && !selectedFile"
           >
-            {{ isUploading ? 'Cancel' : 'Clear' }}
+            <X v-if="isUploading" class="mr-2 h-4 w-4" />
+            {{ isUploading ? 'Cancel Upload' : 'Clear' }}
           </Button>
           <Button
             @click="startUpload"
-            :disabled="!canUpload"
+            :disabled="!canUpload || isUploading"
           >
-            <Upload class="mr-2 h-4 w-4" />
-            Upload Video
+            <Upload v-if="!isUploading" class="mr-2 h-4 w-4" />
+            <Loader2 v-else class="mr-2 h-4 w-4 animate-spin" />
+            {{ isUploading ? 'Uploading...' : 'Upload Video' }}
           </Button>
         </CardFooter>
       </Card>
@@ -125,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Button } from '@/components/ui/button'
@@ -135,7 +176,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Upload, X, AlertCircle } from 'lucide-vue-next'
+import { Upload, X, AlertCircle, Loader2, Clock, TrendingUp } from 'lucide-vue-next'
 
 interface Props {
   maxFileSize: number
@@ -150,6 +191,14 @@ const uploadProgress = ref(0)
 const uploadedBytes = ref(0)
 const error = ref<string | null>(null)
 const uploadController = ref<AbortController | null>(null)
+
+// Upload speed tracking
+const uploadStartTime = ref<number>(0)
+const uploadSpeed = ref(0) // bytes per second
+const estimatedTimeRemaining = ref(0) // seconds
+const uploadPhase = ref<'idle' | 'initiating' | 'uploading' | 'completing'>('idle')
+const lastBytesUpdate = ref(0)
+const lastTimeUpdate = ref(0)
 
 const form = ref({
   title: '',
@@ -171,6 +220,65 @@ function formatFileSize(bytes: number): string {
   }
   
   return `${size.toFixed(2)} ${units[unitIndex]}`
+}
+
+function formatSpeed(bytesPerSecond: number): string {
+  if (bytesPerSecond === 0) return '0 MB/s'
+  const mbps = bytesPerSecond / (1024 * 1024)
+  return `${mbps.toFixed(2)} MB/s`
+}
+
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds <= 0) return 'Calculating...'
+  
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${secs}s`
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`
+  } else {
+    return `${secs}s`
+  }
+}
+
+function updateUploadSpeed(currentBytes: number) {
+  const now = Date.now()
+  
+  // Only update speed calculation every 100ms to avoid too frequent updates
+  if (now - lastTimeUpdate.value < 100) {
+    return
+  }
+  
+  if (lastTimeUpdate.value > 0 && uploadStartTime.value > 0) {
+    const timeDiff = (now - lastTimeUpdate.value) / 1000 // seconds
+    const bytesDiff = currentBytes - lastBytesUpdate.value
+    
+    if (timeDiff > 0 && bytesDiff > 0) {
+      // Calculate instantaneous speed
+      const instantSpeed = bytesDiff / timeDiff
+      
+      // Also calculate overall average speed
+      const totalTime = (now - uploadStartTime.value) / 1000
+      const averageSpeed = currentBytes / totalTime
+      
+      // Weighted average between instant and overall speed
+      uploadSpeed.value = uploadSpeed.value === 0 
+        ? instantSpeed 
+        : (instantSpeed * 0.3 + averageSpeed * 0.3 + uploadSpeed.value * 0.4)
+      
+      // Calculate ETA
+      const remainingBytes = (selectedFile.value?.size || 0) - currentBytes
+      estimatedTimeRemaining.value = uploadSpeed.value > 0 
+        ? remainingBytes / uploadSpeed.value 
+        : 0
+    }
+  }
+  
+  lastBytesUpdate.value = currentBytes
+  lastTimeUpdate.value = now
 }
 
 function handleDrop(event: DragEvent) {
@@ -223,6 +331,12 @@ async function startUpload() {
   uploadProgress.value = 0
   uploadedBytes.value = 0
   uploadController.value = new AbortController()
+  uploadPhase.value = 'initiating'
+  uploadStartTime.value = Date.now()
+  uploadSpeed.value = 0
+  estimatedTimeRemaining.value = 0
+  lastBytesUpdate.value = 0
+  lastTimeUpdate.value = Date.now()
   
   try {
     // Initiate multipart upload
@@ -249,6 +363,7 @@ async function startUpload() {
     const { video_id, upload_id, key } = await initResponse.json()
     
     // Upload file in chunks
+    uploadPhase.value = 'uploading'
     const chunkSize = 100 * 1024 * 1024 // 100MB chunks
     const totalChunks = Math.ceil(selectedFile.value.size / chunkSize)
     const parts: Array<{ PartNumber: number; ETag: string }> = []
@@ -281,27 +396,51 @@ async function startUpload() {
       
       const { url } = await urlResponse.json()
       
-      // Upload the chunk
-      const uploadResponse = await fetch(url, {
-        method: 'PUT',
-        body: chunk,
-        signal: uploadController.value.signal,
+      // Upload the chunk using XMLHttpRequest for progress tracking
+      const etag = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        
+        // Track upload progress for this chunk
+        const chunkStartBytes = start // Use the actual start position of this chunk
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            // Calculate total uploaded bytes: previous chunks + current chunk progress
+            const currentChunkProgress = event.loaded
+            const totalUploaded = chunkStartBytes + currentChunkProgress
+            uploadedBytes.value = Math.min(totalUploaded, selectedFile.value.size)
+            uploadProgress.value = Math.round((uploadedBytes.value / selectedFile.value.size) * 100)
+            updateUploadSpeed(uploadedBytes.value)
+          }
+        }
+        
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const etag = xhr.getResponseHeader('ETag')?.replace(/"/g, '') || ''
+            resolve(etag)
+          } else {
+            reject(new Error(`Failed to upload part ${partNumber}`))
+          }
+        }
+        
+        xhr.onerror = () => reject(new Error(`Network error uploading part ${partNumber}`))
+        xhr.onabort = () => reject(new Error('Upload cancelled'))
+        
+        xhr.open('PUT', url, true)
+        xhr.send(chunk)
+        
+        // Store xhr for potential cancellation
+        if (uploadController.value) {
+          uploadController.value.signal.addEventListener('abort', () => xhr.abort())
+        }
       })
       
-      if (!uploadResponse.ok) {
-        throw new Error(`Failed to upload part ${partNumber}`)
-      }
-      
-      const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '')
       if (etag) {
         parts.push({ PartNumber: partNumber, ETag: etag })
       }
-      
-      uploadedBytes.value = end
-      uploadProgress.value = Math.round((uploadedBytes.value / selectedFile.value.size) * 100)
     }
     
     // Complete multipart upload
+    uploadPhase.value = 'completing'
     const completeResponse = await fetch('/videos/complete-upload', {
       method: 'POST',
       headers: {
@@ -330,6 +469,9 @@ async function startUpload() {
   } finally {
     isUploading.value = false
     uploadController.value = null
+    uploadPhase.value = 'idle'
+    uploadSpeed.value = 0
+    estimatedTimeRemaining.value = 0
   }
 }
 
@@ -345,4 +487,21 @@ async function cancelUpload() {
     form.value.description = ''
   }
 }
+
+// Prevent accidental navigation during upload
+function handleBeforeUnload(event: BeforeUnloadEvent) {
+  if (isUploading.value) {
+    event.preventDefault()
+    event.returnValue = 'You have an upload in progress. Are you sure you want to leave?'
+    return event.returnValue
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
 </script>
