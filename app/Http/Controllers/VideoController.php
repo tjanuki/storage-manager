@@ -85,6 +85,10 @@ class VideoController extends Controller
                 'uploaded_at' => $video->uploaded_at?->format('Y-m-d H:i:s'),
                 'created_at' => $video->created_at->format('Y-m-d H:i:s'),
                 's3_url' => $video->status === 'completed' ? $this->getPresignedUrl($video) : null,
+                'is_public' => $video->is_public,
+                'share_uuid' => $video->share_uuid,
+                'public_url' => $video->public_url,
+                'shared_at' => $video->shared_at?->format('Y-m-d H:i:s'),
             ],
         ]);
     }
@@ -251,6 +255,26 @@ class VideoController extends Controller
             Log::error('Failed to abort upload: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to abort upload'], 500);
         }
+    }
+
+    public function toggleSharing(Video $video): JsonResponse
+    {
+        // Verify ownership
+        if ($video->user_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        if ($video->is_public) {
+            $video->disableSharing();
+        } else {
+            $video->enableSharing();
+        }
+
+        return response()->json([
+            'success' => true,
+            'is_public' => $video->is_public,
+            'public_url' => $video->public_url,
+        ]);
     }
 
     public function destroy(Video $video): JsonResponse

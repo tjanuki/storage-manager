@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class Video extends Model
 {
@@ -23,6 +24,9 @@ class Video extends Model
         'duration',
         'status',
         'upload_id',
+        'share_uuid',
+        'is_public',
+        'shared_at',
         'metadata',
         'uploaded_at',
     ];
@@ -30,8 +34,10 @@ class Video extends Model
     protected $casts = [
         'size' => 'integer',
         'duration' => 'integer',
+        'is_public' => 'boolean',
         'metadata' => 'array',
         'uploaded_at' => 'datetime',
+        'shared_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -85,5 +91,30 @@ class Video extends Model
     public function isFailed(): bool
     {
         return $this->status === 'failed';
+    }
+
+    public function enableSharing(): void
+    {
+        if (!$this->share_uuid) {
+            $this->share_uuid = Str::uuid()->toString();
+        }
+        $this->is_public = true;
+        $this->shared_at = now();
+        $this->save();
+    }
+
+    public function disableSharing(): void
+    {
+        $this->is_public = false;
+        $this->save();
+    }
+
+    public function getPublicUrlAttribute(): ?string
+    {
+        if (!$this->is_public || !$this->share_uuid) {
+            return null;
+        }
+        
+        return url("/share/{$this->share_uuid}");
     }
 }

@@ -13,5 +13,6 @@ Route::middleware(['auth', 'verified'])->prefix('videos')->name('videos.')->grou
     Route::post('/get-upload-url', [VideoController::class, 'getUploadUrl'])->name('get-upload-url');
     Route::post('/complete-upload', [VideoController::class, 'completeUpload'])->name('complete-upload');
     Route::post('/abort-upload', [VideoController::class, 'abortUpload'])->name('abort-upload');
+    Route::post('/{video}/toggle-sharing', [VideoController::class, 'toggleSharing'])->name('toggle-sharing');
     Route::delete('/{video}', [VideoController::class, 'destroy'])->name('destroy');
 });

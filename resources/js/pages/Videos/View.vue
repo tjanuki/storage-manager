@@ -53,21 +53,47 @@
               </div>
             </div>
           </CardContent>
-          <CardFooter class="flex gap-2">
-            <Button
-              @click="downloadVideo"
-              variant="outline"
-            >
-              <Download class="mr-2 h-4 w-4" />
-              Download
-            </Button>
-            <Button
-              @click="deleteVideo"
-              variant="destructive"
-            >
-              <Trash2 class="mr-2 h-4 w-4" />
-              Delete
-            </Button>
+          <CardFooter>
+            <div class="flex w-full flex-col gap-4">
+              <div v-if="isSharing" class="flex items-center gap-2 rounded-lg border p-3">
+                <input
+                  :value="shareUrl"
+                  readonly
+                  class="flex-1 bg-transparent text-sm outline-none"
+                />
+                <Button
+                  @click="copyLink"
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Check v-if="copied" class="h-4 w-4 text-green-600" />
+                  <Copy v-else class="h-4 w-4" />
+                </Button>
+              </div>
+              <div class="flex gap-2">
+                <Button
+                  @click="downloadVideo"
+                  variant="outline"
+                >
+                  <Download class="mr-2 h-4 w-4" />
+                  Download
+                </Button>
+                <Button
+                  @click="toggleSharing"
+                  :variant="isSharing ? 'secondary' : 'outline'"
+                >
+                  <Share2 class="mr-2 h-4 w-4" />
+                  {{ isSharing ? 'Stop Sharing' : 'Share' }}
+                </Button>
+                <Button
+                  @click="deleteVideo"
+                  variant="destructive"
+                >
+                  <Trash2 class="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            </div>
           </CardFooter>
         </Card>
       </div>
@@ -80,7 +106,8 @@ import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Download, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Download, Trash2, Share2, Copy, Check } from 'lucide-vue-next'
+import { ref } from 'vue'
 
 interface VideoData {
   id: number
@@ -96,6 +123,10 @@ interface VideoData {
   created_at: string
   s3_url: string
   thumbnail_url?: string | null
+  is_public: boolean
+  share_uuid: string | null
+  public_url: string | null
+  shared_at: string | null
 }
 
 interface Props {
@@ -104,6 +135,10 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const isSharing = ref(props.video.is_public)
+const shareUrl = ref(props.video.public_url)
+const copied = ref(false)
+
 function downloadVideo() {
   const a = document.createElement('a')
   a.href = props.video.s3_url
@@ -111,6 +146,42 @@ function downloadVideo() {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
+}
+
+async function toggleSharing() {
+  try {
+    const response = await fetch(`/videos/${props.video.id}/toggle-sharing`, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      isSharing.value = data.is_public
+      shareUrl.value = data.public_url
+    } else {
+      alert('Failed to toggle sharing')
+    }
+  } catch (error) {
+    alert('Failed to toggle sharing')
+  }
+}
+
+async function copyLink() {
+  if (shareUrl.value) {
+    try {
+      await navigator.clipboard.writeText(shareUrl.value)
+      copied.value = true
+      setTimeout(() => {
+        copied.value = false
+      }, 2000)
+    } catch (error) {
+      alert('Failed to copy link')
+    }
+  }
 }
 
 async function deleteVideo() {
