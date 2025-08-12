@@ -85,6 +85,77 @@
                   <Share2 class="mr-2 h-4 w-4" />
                   {{ isSharing ? 'Stop Sharing' : 'Share' }}
                 </Button>
+                <Dialog v-if="isSharing" v-model:open="emailDialogOpen">
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Mail class="mr-2 h-4 w-4" />
+                      Send Email
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent class="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Share Video via Email</DialogTitle>
+                      <DialogDescription>
+                        Send this video link to up to 5 email addresses
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form @submit.prevent="sendEmail" class="space-y-4">
+                      <div class="space-y-2">
+                        <Label for="emails">Email Addresses</Label>
+                        <Textarea
+                          id="emails"
+                          v-model="emailForm.emails"
+                          placeholder="Enter email addresses separated by commas"
+                          :disabled="isSending"
+                          class="min-h-[80px]"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                          Separate multiple emails with commas (max 5)
+                        </p>
+                      </div>
+                      <div class="space-y-2">
+                        <Label for="sender_name">Your Name (Optional)</Label>
+                        <Input
+                          id="sender_name"
+                          v-model="emailForm.sender_name"
+                          placeholder="Enter your name"
+                          :disabled="isSending"
+                        />
+                      </div>
+                      <div class="space-y-2">
+                        <Label for="message">Personal Message (Optional)</Label>
+                        <Textarea
+                          id="message"
+                          v-model="emailForm.message"
+                          placeholder="Add a personal note to the email"
+                          :disabled="isSending"
+                          class="min-h-[100px]"
+                          maxlength="500"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                          {{ emailForm.message.length }}/500 characters
+                        </p>
+                      </div>
+                      <Alert v-if="emailStatus.type" :class="emailStatus.type === 'success' ? 'border-green-500' : 'border-red-500'">
+                        <CheckCircle v-if="emailStatus.type === 'success'" class="h-4 w-4 text-green-500" />
+                        <AlertCircle v-else class="h-4 w-4 text-red-500" />
+                        <AlertDescription>
+                          {{ emailStatus.message }}
+                        </AlertDescription>
+                      </Alert>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" @click="emailDialogOpen = false" :disabled="isSending">
+                          Cancel
+                        </Button>
+                        <Button type="submit" :disabled="isSending || !emailForm.emails.trim()">
+                          <Send v-if="!isSending" class="mr-2 h-4 w-4" />
+                          <Loader2 v-else class="mr-2 h-4 w-4 animate-spin" />
+                          {{ isSending ? 'Sending...' : 'Send Email' }}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
                 <Button
                   @click="deleteVideo"
                   variant="destructive"
@@ -106,7 +177,12 @@ import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Download, Trash2, Share2, Copy, Check } from 'lucide-vue-next'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ArrowLeft, Download, Trash2, Share2, Copy, Check, Mail, Send, Loader2, CheckCircle, AlertCircle } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 interface VideoData {
@@ -138,6 +214,17 @@ const props = defineProps<Props>()
 const isSharing = ref(props.video.is_public)
 const shareUrl = ref(props.video.public_url)
 const copied = ref(false)
+const emailDialogOpen = ref(false)
+const isSending = ref(false)
+const emailForm = ref({
+  emails: '',
+  sender_name: '',
+  message: ''
+})
+const emailStatus = ref<{ type: 'success' | 'error' | null; message: string }>({
+  type: null,
+  message: ''
+})
 
 function downloadVideo() {
   const a = document.createElement('a')
@@ -165,7 +252,7 @@ async function toggleSharing() {
     } else {
       alert('Failed to toggle sharing')
     }
-  } catch (error) {
+  } catch {
     alert('Failed to toggle sharing')
   }
 }
@@ -178,9 +265,53 @@ async function copyLink() {
       setTimeout(() => {
         copied.value = false
       }, 2000)
-    } catch (error) {
+    } catch {
       alert('Failed to copy link')
     }
+  }
+}
+
+async function sendEmail() {
+  if (!emailForm.value.emails.trim() || !props.video.share_uuid) return
+
+  isSending.value = true
+  emailStatus.value = { type: null, message: '' }
+
+  try {
+    const response = await fetch(`/share/${props.video.share_uuid}/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      },
+      body: JSON.stringify(emailForm.value)
+    })
+
+    const data = await response.json()
+
+    if (response.ok) {
+      emailStatus.value = {
+        type: 'success',
+        message: data.message || 'Email sent successfully!'
+      }
+      emailForm.value = { emails: '', sender_name: '', message: '' }
+      setTimeout(() => {
+        emailDialogOpen.value = false
+        emailStatus.value = { type: null, message: '' }
+      }, 2000)
+    } else {
+      emailStatus.value = {
+        type: 'error',
+        message: data.error || 'Failed to send email'
+      }
+    }
+  } catch {
+    emailStatus.value = {
+      type: 'error',
+      message: 'Network error. Please try again.'
+    }
+  } finally {
+    isSending.value = false
   }
 }
 
@@ -202,7 +333,7 @@ async function deleteVideo() {
     } else {
       alert('Failed to delete video')
     }
-  } catch (error) {
+  } catch {
     alert('Failed to delete video')
   }
 }

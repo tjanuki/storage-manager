@@ -82,5 +82,5 @@ interface Props {
   video: VideoData
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 </script>
