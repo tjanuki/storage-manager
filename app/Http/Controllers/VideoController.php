@@ -93,6 +93,59 @@ class VideoController extends Controller
         ]);
     }
 
+    public function edit(Video $video): Response
+    {
+        // Verify ownership
+        if ($video->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        return Inertia::render('Videos/Edit', [
+            'video' => [
+                'id' => $video->id,
+                'title' => $video->title,
+                'description' => $video->description,
+                'size' => $video->size,
+                'formatted_size' => $video->formatted_size,
+                'duration' => $video->duration,
+                'formatted_duration' => $video->formatted_duration,
+                'status' => $video->status,
+                'mime_type' => $video->mime_type,
+                'uploaded_at' => $video->uploaded_at?->format('Y-m-d H:i:s'),
+                'created_at' => $video->created_at->format('Y-m-d H:i:s'),
+                's3_url' => $video->status === 'completed' ? $this->getPresignedUrl($video) : null,
+                'is_public' => $video->is_public,
+                'share_uuid' => $video->share_uuid,
+                'public_url' => $video->public_url,
+                'shared_at' => $video->shared_at?->format('Y-m-d H:i:s'),
+            ],
+        ]);
+    }
+
+    public function update(Request $request, Video $video): JsonResponse
+    {
+        // Verify ownership
+        if ($video->user_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $video->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'video' => [
+                'id' => $video->id,
+                'title' => $video->title,
+                'description' => $video->description,
+            ],
+        ]);
+    }
+
     public function initiateUpload(Request $request): JsonResponse
     {
         $request->validate([

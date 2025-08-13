@@ -43,10 +43,10 @@
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     v-if="video.status === 'completed' && video.s3_url"
-                    @click="() => router.visit(`/videos/${video.id}`)"
+                    @click="() => router.visit(`/videos/${video.id}/edit`)"
                   >
                     <Play class="mr-2 h-4 w-4" />
-                    View
+                    Edit
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="video.status === 'completed' && video.s3_url"

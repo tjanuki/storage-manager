@@ -7,6 +7,8 @@ Route::middleware(['auth', 'verified'])->prefix('videos')->name('videos.')->grou
     Route::get('/', [VideoController::class, 'index'])->name('index');
     Route::get('/upload', [VideoController::class, 'create'])->name('create');
     Route::get('/{video}', [VideoController::class, 'show'])->name('show');
+    Route::get('/{video}/edit', [VideoController::class, 'edit'])->name('edit');
+    Route::patch('/{video}', [VideoController::class, 'update'])->name('update');
     
     // API routes for multipart upload
     Route::post('/initiate-upload', [VideoController::class, 'initiateUpload'])->name('initiate-upload');
