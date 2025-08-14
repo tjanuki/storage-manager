@@ -1,9 +1,19 @@
 <template>
   <AppLayout title="Upload Video">
     <div class="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold tracking-tight">Upload Video</h2>
-        <p class="text-muted-foreground">Upload videos up to 10GB to cloud storage</p>
+      <div class="flex items-center gap-4">
+        <Button
+          @click="() => router.visit('/videos')"
+          variant="ghost"
+          size="sm"
+          class="h-8 w-8 p-0"
+        >
+          <ArrowLeft class="h-4 w-4" />
+        </Button>
+        <div>
+          <h2 class="text-2xl font-bold tracking-tight">Upload Video</h2>
+          <p class="text-muted-foreground">Upload videos up to 10GB to cloud storage</p>
+        </div>
       </div>
 
       <Card>
@@ -176,7 +186,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Upload, X, AlertCircle, Loader2, Clock, TrendingUp } from 'lucide-vue-next'
+import { Upload, X, AlertCircle, Loader2, Clock, TrendingUp, ArrowLeft } from 'lucide-vue-next'
 
 interface Props {
   maxFileSize: number

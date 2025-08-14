@@ -24,72 +24,71 @@
         </Button>
       </div>
 
-      <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card v-for="video in videos.data" :key="video.id">
-          <CardHeader>
-            <div class="flex items-start justify-between">
-              <div class="space-y-1">
-                <CardTitle class="line-clamp-1">{{ video.title }}</CardTitle>
-                <CardDescription class="line-clamp-2">
+      <div v-else class="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Size</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Uploaded</TableHead>
+              <TableHead class="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="video in videos.data" :key="video.id">
+              <TableCell class="font-medium">{{ video.title }}</TableCell>
+              <TableCell>
+                <span class="line-clamp-1 max-w-xs">
                   {{ video.description || 'No description' }}
-                </CardDescription>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="sm">
-                    <MoreVertical class="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    v-if="video.status === 'completed' && video.s3_url"
-                    @click="() => router.visit(`/videos/${video.id}/edit`)"
-                  >
-                    <Play class="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    v-if="video.status === 'completed' && video.s3_url"
-                    @click="downloadVideo(video.s3_url, video.title)"
-                  >
-                    <Download class="mr-2 h-4 w-4" />
-                    Download
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    @click="deleteVideo(video.id)"
-                    class="text-destructive"
-                  >
-                    <Trash2 class="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div class="space-y-2 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Size</span>
-                <span>{{ video.formatted_size }}</span>
-              </div>
-              <div v-if="video.formatted_duration" class="flex items-center justify-between">
-                <span class="text-muted-foreground">Duration</span>
-                <span>{{ video.formatted_duration }}</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Status</span>
+                </span>
+              </TableCell>
+              <TableCell>{{ video.formatted_size }}</TableCell>
+              <TableCell>{{ video.formatted_duration || '-' }}</TableCell>
+              <TableCell>
                 <Badge :variant="getStatusVariant(video.status)">
                   {{ video.status }}
                 </Badge>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Uploaded</span>
-                <span>{{ video.uploaded_at || video.created_at }}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </TableCell>
+              <TableCell>{{ video.uploaded_at || video.created_at }}</TableCell>
+              <TableCell class="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <Button variant="ghost" size="sm">
+                      <MoreVertical class="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      v-if="video.status === 'completed' && video.s3_url"
+                      @click="() => router.visit(`/videos/${video.id}/edit`)"
+                    >
+                      <Play class="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      v-if="video.status === 'completed' && video.s3_url"
+                      @click="downloadVideo(video.s3_url, video.title)"
+                    >
+                      <Download class="mr-2 h-4 w-4" />
+                      Download
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      @click="deleteVideo(video.id)"
+                      class="text-destructive"
+                    >
+                      <Trash2 class="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
 
       <div v-if="videos.links.length > 3" class="flex justify-center">
@@ -113,8 +112,16 @@
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   DropdownMenu,
   DropdownMenuContent,
