@@ -46,7 +46,7 @@
           <div class="space-y-2">
             <Label>Video File</Label>
             <div
-              @drop="handleDrop"
+              @drop.prevent="handleDrop"
               @dragover.prevent
               @dragenter.prevent
               @dragleave.prevent
@@ -292,6 +292,8 @@ function updateUploadSpeed(currentBytes: number) {
 }
 
 function handleDrop(event: DragEvent) {
+  event.preventDefault()
+  
   if (isUploading.value) return
   
   const files = event.dataTransfer?.files
