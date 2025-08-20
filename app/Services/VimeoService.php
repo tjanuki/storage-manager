@@ -53,6 +53,28 @@ class VimeoService
         }
     }
 
+    public function getVideo(string $videoId): ?array
+    {
+        try {
+            // Clean the video ID (remove /videos/ prefix if present)
+            $videoId = str_replace('/videos/', '', $videoId);
+            
+            $response = $this->client->get("/videos/{$videoId}", [
+                'query' => [
+                    'fields' => 'uri,name,description,duration,created_time,modified_time,download,files,size',
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (RequestException $e) {
+            Log::error('Failed to fetch Vimeo video', [
+                'video_id' => $videoId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
     public function getAllVideos(): array
     {
         $allVideos = [];
