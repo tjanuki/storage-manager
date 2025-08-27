@@ -15,14 +15,16 @@ use Inertia\Response;
 class VideoController extends Controller
 {
     private S3Client $s3Client;
+
     private string $bucket;
+
     private string $region;
 
     public function __construct()
     {
         $this->region = config('filesystems.disks.s3.region', 'us-east-1');
         $this->bucket = config('filesystems.disks.s3.bucket');
-        
+
         $this->s3Client = new S3Client([
             'version' => 'latest',
             'region' => $this->region,
@@ -154,9 +156,10 @@ class VideoController extends Controller
             'mimetype' => 'required|string|max:100',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
+            'duration' => 'nullable|integer|min:0',
         ]);
 
-        $key = 'videos/' . Auth::id() . '/' . Str::uuid() . '/' . $request->filename;
+        $key = 'videos/'.Auth::id().'/'.Str::uuid().'/'.$request->filename;
 
         try {
             // Create multipart upload
@@ -180,6 +183,7 @@ class VideoController extends Controller
                 's3_region' => $this->region,
                 'size' => $request->filesize,
                 'mime_type' => $request->mimetype,
+                'duration' => $request->duration,
                 'status' => 'uploading',
                 'upload_id' => $result['UploadId'],
             ]);
@@ -190,7 +194,8 @@ class VideoController extends Controller
                 'key' => $key,
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to initiate upload: ' . $e->getMessage());
+            Log::error('Failed to initiate upload: '.$e->getMessage());
+
             return response()->json(['error' => 'Failed to initiate upload'], 500);
         }
     }
@@ -225,7 +230,8 @@ class VideoController extends Controller
                 'url' => (string) $presignedUrl->getUri(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to get upload URL: ' . $e->getMessage());
+            Log::error('Failed to get upload URL: '.$e->getMessage());
+
             return response()->json(['error' => 'Failed to get upload URL'], 500);
         }
     }
@@ -269,11 +275,11 @@ class VideoController extends Controller
                 'location' => $result['Location'],
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to complete upload: ' . $e->getMessage());
-            
+            Log::error('Failed to complete upload: '.$e->getMessage());
+
             // Mark video as failed
             $video->update(['status' => 'failed']);
-            
+
             return response()->json(['error' => 'Failed to complete upload'], 500);
         }
     }
@@ -305,7 +311,8 @@ class VideoController extends Controller
 
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            Log::error('Failed to abort upload: ' . $e->getMessage());
+            Log::error('Failed to abort upload: '.$e->getMessage());
+
             return response()->json(['error' => 'Failed to abort upload'], 500);
         }
     }
@@ -349,7 +356,8 @@ class VideoController extends Controller
 
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            Log::error('Failed to delete video: ' . $e->getMessage());
+            Log::error('Failed to delete video: '.$e->getMessage());
+
             return response()->json(['error' => 'Failed to delete video'], 500);
         }
     }
@@ -362,6 +370,7 @@ class VideoController extends Controller
         ]);
 
         $presignedUrl = $this->s3Client->createPresignedRequest($command, '+60 minutes');
+
         return (string) $presignedUrl->getUri();
     }
 }

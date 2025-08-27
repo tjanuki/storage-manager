@@ -81,9 +81,13 @@
             <div class="flex items-start justify-between">
               <div class="space-y-1">
                 <p class="text-sm font-medium">{{ selectedFile.name }}</p>
-                <p class="text-xs text-muted-foreground">
-                  {{ formatFileSize(selectedFile.size) }}
-                </p>
+                <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{{ formatFileSize(selectedFile.size) }}</span>
+                  <span v-if="videoDuration" class="flex items-center gap-1">
+                    <Clock class="h-3 w-3" />
+                    {{ formatDuration(videoDuration) }}
+                  </span>
+                </div>
               </div>
               <Button
                 v-if="!isUploading"
@@ -215,6 +219,8 @@ const form = ref({
   description: '',
 })
 
+const videoDuration = ref<number | null>(null)
+
 const canUpload = computed(() => {
   return selectedFile.value && form.value.title && !isUploading.value
 })
@@ -309,7 +315,7 @@ function handleFileSelect(event: Event) {
   }
 }
 
-function handleFile(file: File) {
+async function handleFile(file: File) {
   error.value = null
   
   if (!file.type.startsWith('video/')) {
@@ -326,10 +332,45 @@ function handleFile(file: File) {
   if (!form.value.title) {
     form.value.title = file.name.replace(/\.[^/.]+$/, '')
   }
+  
+  // Extract video duration
+  extractVideoDuration(file)
+}
+
+function extractVideoDuration(file: File) {
+  const video = document.createElement('video')
+  video.preload = 'metadata'
+  
+  video.onloadedmetadata = function() {
+    videoDuration.value = Math.floor(video.duration)
+    URL.revokeObjectURL(video.src)
+  }
+  
+  video.onerror = function() {
+    console.warn('Could not extract video duration')
+    videoDuration.value = null
+    URL.revokeObjectURL(video.src)
+  }
+  
+  video.src = URL.createObjectURL(file)
+}
+
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return 'Unknown'
+  
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`
 }
 
 function removeFile() {
   selectedFile.value = null
+  videoDuration.value = null
   if (fileInput.value) {
     fileInput.value.value = ''
   }
@@ -364,6 +405,7 @@ async function startUpload() {
         mimetype: selectedFile.value.type,
         title: form.value.title,
         description: form.value.description,
+        duration: videoDuration.value,
       }),
       signal: uploadController.value.signal,
     })
