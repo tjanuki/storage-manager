@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Str;
 
 class Video extends Model
@@ -45,6 +46,11 @@ class Video extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function tags(): MorphToMany
+    {
+        return $this->morphToMany(Tag::class, 'taggable')->withTimestamps();
+    }
+
     public function getS3UrlAttribute(): string
     {
         return "https://{$this->s3_bucket}.s3.{$this->s3_region}.amazonaws.com/{$this->s3_key}";
@@ -58,12 +64,12 @@ class Video extends Model
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
 
-        return round($bytes, 2) . ' ' . $units[$pow];
+        return round($bytes, 2).' '.$units[$pow];
     }
 
     public function getFormattedDurationAttribute(): ?string
     {
-        if (!$this->duration) {
+        if (! $this->duration) {
             return null;
         }
 
@@ -95,7 +101,7 @@ class Video extends Model
 
     public function enableSharing(): void
     {
-        if (!$this->share_uuid) {
+        if (! $this->share_uuid) {
             $this->share_uuid = Str::uuid()->toString();
         }
         $this->is_public = true;
@@ -111,10 +117,46 @@ class Video extends Model
 
     public function getPublicUrlAttribute(): ?string
     {
-        if (!$this->is_public || !$this->share_uuid) {
+        if (! $this->is_public || ! $this->share_uuid) {
             return null;
         }
-        
+
         return url("/share/{$this->share_uuid}");
+    }
+
+    public function syncTags(array $tagNames): void
+    {
+        $tagIds = collect($tagNames)->map(function ($tagName) {
+            return Tag::firstOrCreate(
+                ['slug' => Str::slug($tagName)],
+                ['name' => $tagName]
+            )->id;
+        })->toArray();
+
+        $this->tags()->sync($tagIds);
+    }
+
+    public function attachTag(string $tagName): void
+    {
+        $tag = Tag::firstOrCreate(
+            ['slug' => Str::slug($tagName)],
+            ['name' => $tagName]
+        );
+
+        $this->tags()->syncWithoutDetaching([$tag->id]);
+    }
+
+    public function detachTag(string $tagName): void
+    {
+        $tag = Tag::where('slug', Str::slug($tagName))->first();
+
+        if ($tag) {
+            $this->tags()->detach($tag->id);
+        }
+    }
+
+    public function hasTag(string $tagName): bool
+    {
+        return $this->tags()->where('slug', Str::slug($tagName))->exists();
     }
 }

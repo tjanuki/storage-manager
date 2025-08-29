@@ -30,6 +30,7 @@
             <TableRow>
               <TableHead>Title</TableHead>
               <TableHead>Description</TableHead>
+              <TableHead>Tags</TableHead>
               <TableHead>Size</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Status</TableHead>
@@ -44,6 +45,21 @@
                 <span class="line-clamp-1 max-w-xs">
                   {{ video.description || 'No description' }}
                 </span>
+              </TableCell>
+              <TableCell>
+                <div class="flex flex-wrap gap-1">
+                  <Badge
+                    v-for="tag in video.tags"
+                    :key="tag"
+                    variant="secondary"
+                    class="text-xs"
+                  >
+                    {{ tag }}
+                  </Badge>
+                  <span v-if="!video.tags || video.tags.length === 0" class="text-muted-foreground text-sm">
+                    -
+                  </span>
+                </div>
               </TableCell>
               <TableCell>{{ video.formatted_size }}</TableCell>
               <TableCell>{{ video.formatted_duration || '-' }}</TableCell>
@@ -144,6 +160,7 @@ interface VideoData {
   uploaded_at: string | null
   created_at: string
   s3_url: string | null
+  tags?: string[]
 }
 
 interface Props {

@@ -34,6 +34,17 @@
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div v-if="video.tags && video.tags.length > 0" class="mb-4">
+              <div class="flex flex-wrap gap-2">
+                <Badge
+                  v-for="tag in video.tags"
+                  :key="tag"
+                  variant="secondary"
+                >
+                  {{ tag }}
+                </Badge>
+              </div>
+            </div>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div class="space-y-1">
                 <p class="text-sm text-muted-foreground">Size</p>
@@ -176,6 +187,7 @@
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -203,6 +215,7 @@ interface VideoData {
   share_uuid: string | null
   public_url: string | null
   shared_at: string | null
+  tags?: string[]
 }
 
 interface Props {

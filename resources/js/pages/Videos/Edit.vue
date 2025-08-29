@@ -56,6 +56,49 @@
                   class="min-h-[100px]"
                 />
               </div>
+              <div class="space-y-2">
+                <Label for="tags">Tags</Label>
+                <div class="space-y-2">
+                  <div class="flex flex-wrap gap-2">
+                    <div
+                      v-for="(tag, index) in editForm.tags"
+                      :key="index"
+                      class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-sm"
+                    >
+                      <span>{{ tag }}</span>
+                      <button
+                        type="button"
+                        @click="removeTag(index)"
+                        :disabled="isSaving"
+                        class="ml-1 rounded-full p-0.5 hover:bg-primary/20"
+                      >
+                        <X class="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <Input
+                      id="tags"
+                      v-model="newTag"
+                      @keydown.enter.prevent="addTag"
+                      placeholder="Add a tag and press Enter"
+                      :disabled="isSaving"
+                    />
+                    <Button
+                      type="button"
+                      @click="addTag"
+                      variant="outline"
+                      size="sm"
+                      :disabled="isSaving || !newTag.trim()"
+                    >
+                      <Plus class="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    Press Enter or click the + button to add tags
+                  </p>
+                </div>
+              </div>
               <div class="flex gap-2">
                 <Button type="submit" :disabled="isSaving || !hasChanges">
                   <Save v-if="!isSaving" class="mr-2 h-4 w-4" />
@@ -252,6 +295,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import TagsInput from '@/components/TagsInput.vue'
 import { ArrowLeft, Save, Trash2, Share2, Copy, Check, Mail, Send, Loader2, CheckCircle, AlertCircle } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
 
@@ -273,6 +317,7 @@ interface VideoData {
   share_uuid: string | null
   public_url: string | null
   shared_at: string | null
+  tags: string[]
 }
 
 interface Props {
@@ -284,13 +329,18 @@ const props = defineProps<Props>()
 // Edit form state
 const editForm = ref({
   title: props.video.title,
-  description: props.video.description || ''
+  description: props.video.description || '',
+  tags: [...(props.video.tags || [])]
 })
 
 const originalForm = {
   title: props.video.title,
-  description: props.video.description || ''
+  description: props.video.description || '',
+  tags: [...(props.video.tags || [])]
 }
+
+// Tags state
+const newTag = ref('')
 
 const isSaving = ref(false)
 const saveStatus = ref<{ type: 'success' | 'error' | null; message: string }>({
@@ -300,7 +350,8 @@ const saveStatus = ref<{ type: 'success' | 'error' | null; message: string }>({
 
 const hasChanges = computed(() => {
   return editForm.value.title !== originalForm.title ||
-         editForm.value.description !== originalForm.description
+         editForm.value.description !== originalForm.description ||
+         JSON.stringify(editForm.value.tags) !== JSON.stringify(originalForm.tags)
 })
 
 // Sharing state
@@ -344,6 +395,7 @@ async function saveChanges() {
       }
       originalForm.title = editForm.value.title
       originalForm.description = editForm.value.description
+      originalForm.tags = [...editForm.value.tags]
       setTimeout(() => {
         saveStatus.value = { type: null, message: '' }
       }, 3000)
@@ -366,7 +418,21 @@ async function saveChanges() {
 function resetForm() {
   editForm.value.title = originalForm.title
   editForm.value.description = originalForm.description
+  editForm.value.tags = [...originalForm.tags]
+  newTag.value = ''
   saveStatus.value = { type: null, message: '' }
+}
+
+function addTag() {
+  const tag = newTag.value.trim()
+  if (tag && !editForm.value.tags.includes(tag)) {
+    editForm.value.tags.push(tag)
+    newTag.value = ''
+  }
+}
+
+function removeTag(index: number) {
+  editForm.value.tags.splice(index, 1)
 }
 
 async function toggleSharing() {

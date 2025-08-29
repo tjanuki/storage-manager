@@ -38,6 +38,7 @@ class VideoController extends Controller
     public function index(): Response
     {
         $videos = Auth::user()->videos()
+            ->with('tags')
             ->latest()
             ->paginate(12);
 
@@ -55,6 +56,7 @@ class VideoController extends Controller
                 'uploaded_at' => $video->uploaded_at?->format('Y-m-d H:i:s'),
                 'created_at' => $video->created_at->format('Y-m-d H:i:s'),
                 's3_url' => $video->status === 'completed' ? $this->getPresignedUrl($video) : null,
+                'tags' => $video->tags->pluck('name')->toArray(),
             ]),
         ]);
     }
@@ -72,6 +74,9 @@ class VideoController extends Controller
         if ($video->user_id !== Auth::id()) {
             abort(403);
         }
+
+        // Load tags relationship
+        $video->load('tags');
 
         return Inertia::render('Videos/View', [
             'video' => [
@@ -91,6 +96,7 @@ class VideoController extends Controller
                 'share_uuid' => $video->share_uuid,
                 'public_url' => $video->public_url,
                 'shared_at' => $video->shared_at?->format('Y-m-d H:i:s'),
+                'tags' => $video->tags->pluck('name')->toArray(),
             ],
         ]);
     }
@@ -101,6 +107,9 @@ class VideoController extends Controller
         if ($video->user_id !== Auth::id()) {
             abort(403);
         }
+
+        // Load tags relationship
+        $video->load('tags');
 
         return Inertia::render('Videos/Edit', [
             'video' => [
@@ -120,6 +129,7 @@ class VideoController extends Controller
                 'share_uuid' => $video->share_uuid,
                 'public_url' => $video->public_url,
                 'shared_at' => $video->shared_at?->format('Y-m-d H:i:s'),
+                'tags' => $video->tags->pluck('name')->toArray(),
             ],
         ]);
     }
@@ -134,9 +144,19 @@ class VideoController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:50',
         ]);
 
-        $video->update($validated);
+        $video->update([
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        // Sync tags if provided
+        if (isset($validated['tags'])) {
+            $video->syncTags($validated['tags']);
+        }
 
         return response()->json([
             'success' => true,
@@ -144,6 +164,7 @@ class VideoController extends Controller
                 'id' => $video->id,
                 'title' => $video->title,
                 'description' => $video->description,
+                'tags' => $video->tags->pluck('name')->toArray(),
             ],
         ]);
     }
